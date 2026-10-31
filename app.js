@@ -32,6 +32,63 @@ $("addExample").onclick=()=>{const prompt=$("examplePrompt").value.trim(),answer
 $("clearExamples").onclick=()=>{if(confirm("Delete all training examples?")){data.examples=[];save();render()}};
 $("draftExamples").onclick=async()=>{const topic=$("examplePrompt").value.trim()||prompt("What topic should the examples cover?");if(!topic)return;try{$("draftExamples").disabled=true;const result=await groq([{role:"system",content:"Create exactly 3 high-quality fine-tuning examples. Return only valid JSON array with objects {prompt,answer,category}. Answers must be useful, accurate, distinct, and not mention this instruction."},{role:"user",content:"Topic/context: "+topic+"\nExisting teaching memories: "+data.memories.map(m=>m.title+": "+m.content).join("\n")}]);const clean=result.replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();drafts=JSON.parse(clean);if(!Array.isArray(drafts))throw Error("Expected JSON array");$("draftList").innerHTML=drafts.map((d,i)=>'<label><input type="checkbox" class="draft-check" data-i="'+i+'" checked> <b>'+esc(d.category||"example")+'</b><p>'+esc(d.prompt)+'</p><p>'+esc(d.answer)+'</p></label>').join("");$("draftBox").classList.remove("hidden");toast("Review the drafts, then add the examples you want.")}catch(e){toast("Could not draft examples: "+e.message)}finally{$("draftExamples").disabled=false}};
 $("addDrafts").onclick=()=>{document.querySelectorAll(".draft-check:checked").forEach(c=>{const d=drafts[Number(c.dataset.i)];if(d?.prompt&&d?.answer)data.examples.push({...d,created:new Date().toISOString()})});save();render();$("draftBox").classList.add("hidden");toast("Selected examples added.")};
+
+let grindRunning=false,grindStopRequested=false;
+function normalizeText(s){return String(s||"").toLowerCase().replace(/\s+/g," ").trim()}
+function parseGeneratedExamples(raw){
+  let s=String(raw||"").trim().replace(/^\x60\x60\x60(?:json)?\s*/i,"").replace(/\s*\x60\x60\x60$/,"");
+  try { const v=JSON.parse(s); if(Array.isArray(v))return v; if(Array.isArray(v.examples))return v.examples; } catch {}
+  const start=s.indexOf("["),end=s.lastIndexOf("]");
+  if(start>=0&&end>start){const v=JSON.parse(s.slice(start,end+1));if(Array.isArray(v))return v;}
+  throw Error("Groq did not return a valid JSON array. Try again or reduce the batch size.");
+}
+$("startGrind").onclick=async()=>{
+  if(grindRunning)return;
+  const topic=$("grindTopic").value.trim();
+  const target=Math.max(1,Math.min(500,Number($("grindTarget").value)||50));
+  const batchSize=Math.max(1,Math.min(10,Number($("grindBatch").value)||5));
+  if(!groqKey){toast("Add your Groq API key in Model connection first.");go("connect");return;}
+  if(!topic){toast("Enter a training topic first.");$("grindTopic").focus();return;}
+  if(data.examples.length>=target){$("grindStatus").textContent="Target already reached: "+data.examples.length+" examples are saved.";return;}
+  grindRunning=true;grindStopRequested=false;$("startGrind").disabled=true;$("stopGrind").disabled=false;
+  let addedThisRun=0,failedBatches=0;
+  try{
+    while(!grindStopRequested&&data.examples.length<target){
+      const wanted=Math.min(batchSize,target-data.examples.length);
+      $("grindStatus").textContent="Groq is generating up to "+wanted+" examples… Saved: "+data.examples.length+"/"+target+".";
+      const known=data.examples.slice(-120).map(x=>String(x.prompt||"")).join("\n");
+      const memories=data.memories.slice(-60).map(m=>m.title+": "+m.content).join("\n");
+      const raw=await groq([
+        {role:"system",content:"You are a careful training-data curator. Return ONLY a valid JSON array, no markdown. Each item must have string fields prompt, answer, category. Generate exactly "+wanted+" distinct, high-quality supervised fine-tuning examples. Make questions and answers concrete, useful, accurate, self-contained, varied in difficulty, and non-repetitive. Do not invent facts. If the topic asks for cybersecurity, keep examples defensive, authorized, and educational. Avoid duplicates of existing prompts. Do not include explanations outside the JSON."},
+        {role:"user",content:"Topic and goals: "+topic+"\nMarcus system style: "+data.systemPrompt+"\nTeaching memories to reflect when relevant:\n"+(memories||"(none)")+"\nExisting prompt examples to avoid repeating:\n"+(known||"(none)")+"\nReturn exactly "+wanted+" new examples."}
+      ]);
+      const generated=parseGeneratedExamples(raw);
+      let added=0;
+      for(const item of generated){
+        if(grindStopRequested||data.examples.length>=target)break;
+        const promptText=String(item?.prompt||"").trim(),answerText=String(item?.answer||"").trim();
+        if(!promptText||!answerText)continue;
+        const key=normalizeText(promptText);
+        if(data.examples.some(x=>normalizeText(x.prompt)===key))continue;
+        data.examples.push({prompt:promptText,answer:answerText,category:String(item.category||topic).trim(),created:new Date().toISOString(),source:"groq-auto"});
+        added++;addedThisRun++;
+      }
+      save();render();
+      if(added===0){failedBatches++;if(failedBatches>=3)throw Error("Three batches produced no new unique examples. Change the topic or reduce the batch size.");}
+      else failedBatches=0;
+      $("grindStatus").textContent="Saved "+data.examples.length+"/"+target+" examples ("+addedThisRun+" added this run). "+(grindStopRequested?"Stopping…":"Continuing automatically…");
+      if(!grindStopRequested&&data.examples.length<target)await new Promise(resolve=>setTimeout(resolve,900));
+    }
+    $("grindStatus").textContent=grindStopRequested?"Paused. Saved "+data.examples.length+" total examples; "+addedThisRun+" added this run.":"Finished! Saved "+data.examples.length+" total examples; "+addedThisRun+" added this run.";
+    toast(grindStopRequested?"Training-data grind paused.":"Training-data grind finished.");
+  }catch(e){
+    $("grindStatus").textContent="Stopped after saving "+addedThisRun+" examples this run. Error: "+e.message;
+    toast("Grind stopped: "+e.message);
+  }finally{
+    grindRunning=false;$("startGrind").disabled=false;$("stopGrind").disabled=true;save();render();
+  }
+};
+$("stopGrind").onclick=()=>{grindStopRequested=true;$("stopGrind").disabled=true;$("grindStatus").textContent="Stopping after the current Groq request…";};
 $("useExample").onclick=()=>{if(!data.examples.length)return toast("Add a training example first.");const x=data.examples[Math.floor(Math.random()*data.examples.length)];$("evalPrompt").value=x.prompt;$("evalExpected").value=x.answer};
 $("getMarcusAnswer").onclick=async()=>{try{$("evalActual").value=await askMarcus(contextMessages($("evalPrompt").value))}catch(e){toast(e.message)}};
 $("gradeAnswer").onclick=async()=>{const q=$("evalPrompt").value.trim(),actual=$("evalActual").value.trim(),expected=$("evalExpected").value.trim();if(!q||!actual||!expected)return toast("Fill in the question, Marcus answer, and ideal answer.");try{$("evalResult").textContent="Evaluating…";$("gradeAnswer").disabled=true;$("evalResult").textContent=await groq([{role:"system",content:"Evaluate the model answer against the ideal answer. Give a score from 0 to 100, list what is correct, what is missing or wrong, and a concrete improvement suggestion. Be fair; wording need not match exactly."},{role:"user",content:"Question: "+q+"\nIdeal answer: "+expected+"\nModel answer: "+actual}])}catch(e){$("evalResult").textContent=e.message}finally{$("gradeAnswer").disabled=false}};
