@@ -1,35 +1,37 @@
-# Marcus Studio
+# Marcus — Personal Workspace
 
-Marcus Studio is the development workspace for building a **new Marcus assistant**. It is not the old terminal assistant and is not intended to be the final end-user assistant app.
+Marcus is a personal assistant workspace hosted as a static site.
 
-## First version includes
+## Working features
 
-- Overview dashboard
-- Model manager with provider selection UI
-- Generation settings: temperature, Top-P, Top-K, max output tokens, frequency/presence penalties, context length, streaming and memory toggles
-- Memory Studio for explicit teaching entries
-- Training Lab for prompt/ideal-answer dataset examples
-- Chat Builder preview and editable system-prompt draft
-- System Monitor with honest placeholders for metrics that require a backend
-- Project settings and JSON exports
-- Responsive layout and light/dark theme toggle
+- Live chat using a Groq-compatible Chat Completions API.
+- Model Manager for choosing a provider, model ID, and endpoint.
+- Browser-only API key entry; the key is never written into the Git repository or exported workspace JSON.
+- Model settings for temperature, Top-P, and maximum output tokens.
+- Teaching Memory: explicit memory entries are included as context in future chats.
+- Training Lab: prompt/ideal-answer examples are kept separate and included as reference examples; saving examples does **not** fine-tune or change model weights.
+- Editable system prompt, JSON exports, theme toggle, and status dashboard.
 
-## Current limitations
+## Connect a model
 
-- Settings, memories, training examples, provider choice and prompt draft are saved in this browser's localStorage.
-- The UI does **not** call a real AI model yet.
-- Saving Q&A examples does **not** train model weights.
-- API keys are not accepted or stored in this frontend. Real provider calls should go through a backend with credentials stored server-side.
-- Runtime metrics remain blank until a backend/model runtime reports real measurements.
+1. Open the published Marcus site and select **Model Manager**.
+2. Select **Groq**.
+3. Enter a currently supported model ID from your Groq console (the default suggestion is `llama-3.3-70b-versatile`).
+4. Paste your API key into the password field and choose **Save connection**.
+5. Choose **Test connection**. If it succeeds, open **Chat** and send a message.
 
-## Run it
+The default endpoint is `https://api.groq.com/openai/v1/chat/completions`. You can set another OpenAI-compatible endpoint if appropriate for your provider.
 
-Open `index.html` in a browser, or serve the folder with a static web server. GitHub Pages can host the UI; a real model connection will require a backend service.
+## Security note
 
-## Next development layer
+This first version calls the provider directly from the browser. The key is saved in that browser's localStorage, not in the repository. This is convenient for a personal prototype but is **not as secure as a backend**: anyone with access to your browser profile can inspect browser storage, and browser extensions or injected scripts could potentially access it. Use a low-limit test key, never share the browser profile, and revoke the key if exposed. For a public or multi-user deployment, replace direct browser calls with a backend that keeps secrets in server-side environment variables.
 
-1. Add a small backend API.
-2. Add secure server-side provider configuration.
-3. Connect the Chat Builder to real inference.
-4. Store memories and datasets in a database instead of browser-only storage.
-5. Add evaluation tools and, only if supported, a genuine fine-tuning workflow.
+## Teaching vs training
+
+- **Teaching** saves explicit memory entries and sends them as context to the model.
+- **Training examples** save prompt/ideal-answer pairs and provide a small set as context examples.
+- Neither action changes model weights. Real fine-tuning requires a compatible model and a separate training service.
+
+## Hosting
+
+GitHub Pages can host the frontend. The model provider must allow browser-origin requests; if the browser blocks a request due to CORS, a small backend proxy is required. Never put an API key directly in HTML, JavaScript, or a committed configuration file.
