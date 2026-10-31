@@ -1,0 +1,7 @@
+name = "marcus-llama-api"
+main = "src/index.js"
+compatibility_date = "2026-10-31"
+workers_dev = true
+
+[ai]
+binding = "AI"
