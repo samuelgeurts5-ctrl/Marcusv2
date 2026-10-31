@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 const STORE="marcus-studio-v1";
 const defaults={memories:[],examples:[],evaluations:[],model:{endpoint:"",id:""},systemPrompt:"You are Marcus, a helpful assistant. Be accurate, explain your reasoning clearly, and admit uncertainty.",created:new Date().toISOString()};
-let data=loadData(),drafts=[],browserEngine=null,browserModelLoading=false;
+let data=loadData(),drafts=[];
 let modelKey=sessionStorage.getItem("marcus-model-key")||"",groqKey=sessionStorage.getItem("marcus-groq-key")||"",groqModel=sessionStorage.getItem("marcus-groq-model")||"llama-3.3-70b-versatile";
 function loadData(){try{return {...defaults,...JSON.parse(localStorage.getItem(STORE)||"{}")}}catch{return {...defaults}}}
 function save(){localStorage.setItem(STORE,JSON.stringify(data));renderStats()}
@@ -18,28 +18,7 @@ $("modelEndpoint").value=data.model.endpoint||"";$("modelId").value=data.model.i
 $("saveModel").onclick=()=>{data.model={endpoint:$("modelEndpoint").value.trim().replace(/\/$/,""),id:$("modelId").value.trim()};modelKey=$("modelKey").value.trim();sessionStorage.setItem("marcus-model-key",modelKey);save();toast("Model connection saved in this browser.")};
 $("saveGroq").onclick=()=>{groqKey=$("groqKey").value.trim();groqModel=$("groqModel").value.trim()||"llama-3.3-70b-versatile";sessionStorage.setItem("marcus-groq-key",groqKey);sessionStorage.setItem("marcus-groq-model",groqModel);toast("Groq helper key saved for this browser session.")};
 
-const BROWSER_MODEL="Llama-3.1-8B-Instruct-q4f16_1-MLC";
-function browserStatus(s){const el=$("browserModelStatus");if(el)el.textContent=s}
-async function startBrowserModel(){
- if(browserEngine){toast("Browser Llama is already loaded.");return}
- if(browserModelLoading)return;
- if(!navigator.gpu){browserStatus("WebGPU unavailable in this browser");toast("This browser/device does not expose WebGPU. Try a compatible recent browser and computer.");return}
- browserModelLoading=true;const btn=$("startBrowserModel");btn.disabled=true;btn.textContent="Loading model…";browserStatus("Downloading model files (several GB)…");status("Loading browser Llama…");
- try{
-  const {CreateMLCEngine}=await import("https://esm.run/@mlc-ai/web-llm");
-  browserEngine=await CreateMLCEngine(BROWSER_MODEL,{initProgressCallback:p=>{const msg=p.text||"Loading model…";browserStatus(msg);status(msg)}});
-  browserStatus("Llama 3.1 8B ready in this browser");$("browserModelBadge").textContent="LOCAL MODEL READY";toast("Llama is ready. The first download can take a while.");
-  $("modelStatus").textContent="Browser Llama ready";$("modelLabel").textContent="Llama 3.1 8B Instruct";status("Browser Llama ready");
- }catch(e){browserEngine=null;browserStatus("Could not load model: "+e.message);status("Browser model failed");toast("Could not load browser Llama: "+e.message)}
- finally{browserModelLoading=false;btn.disabled=false;btn.textContent=browserEngine?"Llama loaded ✓":"Load Llama in this browser"}
-}
-if($("startBrowserModel"))$("startBrowserModel").onclick=startBrowserModel;
-async function browserChat(messages){
- if(!browserEngine)throw Error("First click “Load Llama in this browser” in Model connection.");
- const result=await browserEngine.chat.completions.create({messages,temperature:0.7,max_tokens:700});
- return result.choices?.[0]?.message?.content||"(No response returned.)";
-}
-async function askMarcus(messages){if(browserEngine)return browserChat(messages);if(data.model.endpoint)return api(data.model.endpoint,modelKey,data.model.id,messages);throw Error("Load Llama in this browser, or configure a remote model endpoint.");}
+async function askMarcus(messages){if(!data.model.endpoint)throw Error("Marcus is hosted remotely. Configure the hosted model endpoint first.");return api(data.model.endpoint,modelKey,data.model.id,messages)}
 async function api(endpoint,key,model,messages){if(!endpoint)throw Error("Add an endpoint URL first.");const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json",...(key?{Authorization:"Bearer "+key}:{})},body:JSON.stringify({model,messages,temperature:.3})});const body=await r.json().catch(()=>({}));if(!r.ok)throw Error(body.error?.message||"Request failed ("+r.status+"). Check endpoint, model ID, key, and CORS.");return body.choices?.[0]?.message?.content||JSON.stringify(body)}
 async function groq(messages){if(!groqKey)throw Error("Add your Groq API key in Model connection first.");return api("https://api.groq.com/openai/v1/chat/completions",groqKey,groqModel,messages)}
 function contextMessages(prompt){const memory=data.memories.slice(-40).map(m=>m.title+": "+m.content).join("\n");const ex=data.examples.slice(-8).map(x=>"Question: "+x.prompt+"\nIdeal answer: "+x.answer).join("\n\n");return [{role:"system",content:data.systemPrompt+"\n\nTeaching memories:\n"+(memory||"(none)")+"\n\nReference examples:\n"+(ex||"(none)")},{role:"user",content:prompt}]}
