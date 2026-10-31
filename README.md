@@ -6,7 +6,7 @@ A GitHub Pages control panel for teaching, dataset curation, evaluation, and exp
 - Teaching memories stored in this browser
 - Prompt/ideal-answer training examples
 - Optional Groq helper to draft examples and evaluate answers
-- Connect to a separately hosted OpenAI-compatible Llama endpoint
+- Chat with Llama hosted remotely through a Cloudflare Worker template
 - Export JSONL, CSV, JSON backup, and a source ZIP
 - Import Marcus data from a backup ZIP
 
