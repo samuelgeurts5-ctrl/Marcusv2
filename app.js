@@ -2,7 +2,8 @@ const $=id=>document.getElementById(id);
 const STORE="marcus-studio-v1";
 const defaults={memories:[],examples:[],evaluations:[],model:{endpoint:"",id:""},systemPrompt:"You are Marcus, a helpful assistant. Be accurate, explain your reasoning clearly, and admit uncertainty.",created:new Date().toISOString()};
 let data=loadData(),drafts=[];
-let modelKey=sessionStorage.getItem("marcus-model-key")||"",groqKey=sessionStorage.getItem("marcus-groq-key")||"",groqModel=sessionStorage.getItem("marcus-groq-model")||"llama-3.3-70b-versatile";
+let modelKey=sessionStorage.getItem("marcus-model-key")||"",groqKey=sessionStorage.getItem("marcus-groq-key")||"",groqModel=sessionStorage.getItem("marcus-groq-model")||"openai/gpt-oss-20b";
+if(groqModel==="llama-3.3-70b-versatile"||groqModel==="llama-3.1-8b-instant")groqModel="openai/gpt-oss-20b";
 function loadData(){try{return {...defaults,...JSON.parse(localStorage.getItem(STORE)||"{}")}}catch{return {...defaults}}}
 function save(){localStorage.setItem(STORE,JSON.stringify(data));renderStats()}
 function toast(s){$("toast").textContent=s;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),3500)}
