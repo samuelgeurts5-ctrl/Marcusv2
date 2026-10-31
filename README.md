@@ -1,37 +1,22 @@
-# Marcus — Personal Workspace
+# Marcus — Llama Training Studio
 
-Marcus is a personal assistant workspace hosted as a static site.
+A GitHub Pages control panel for teaching, dataset curation, evaluation, and exporting a fine-tuning dataset.
 
-## Working features
+## Features
+- Teaching memories stored in this browser
+- Prompt/ideal-answer training examples
+- Optional Groq helper to draft examples and evaluate answers
+- Connect to a separately hosted OpenAI-compatible Llama endpoint
+- Export JSONL, CSV, JSON backup, and a source ZIP
+- Import Marcus data from a backup ZIP
 
-- Live chat using a Groq-compatible Chat Completions API.
-- Model Manager for choosing a provider, model ID, and endpoint.
-- Browser-only API key entry; the key is never written into the Git repository or exported workspace JSON.
-- Model settings for temperature, Top-P, and maximum output tokens.
-- Teaching Memory: explicit memory entries are included as context in future chats.
-- Training Lab: prompt/ideal-answer examples are kept separate and included as reference examples; saving examples does **not** fine-tune or change model weights.
-- Editable system prompt, JSON exports, theme toggle, and status dashboard.
+## Important model distinction
+This static site does not install or host Llama. Set up a separate hosted inference endpoint and configure its URL/model ID in Model connection. The endpoint must allow browser CORS requests. For production, use a backend to protect secrets.
 
-## Connect a model
+Groq can help prepare and evaluate examples; it does not fine-tune Llama model weights. The JSONL export is training data, not a trained model. Actual fine-tuning requires a separate provider or GPU environment that supports the selected model.
 
-1. Open the published Marcus site and select **Model Manager**.
-2. Select **Groq**.
-3. Enter a currently supported model ID from your Groq console (the default suggestion is `llama-3.3-70b-versatile`).
-4. Paste your API key into the password field and choose **Save connection**.
-5. Choose **Test connection**. If it succeeds, open **Chat** and send a message.
+## API key safety
+This is a public static website. Keys entered here are held in browser session storage and sent to their respective APIs; anyone with access to the browser session could use them. Do not use valuable or production keys here. Keys are excluded from ZIP/data exports.
 
-The default endpoint is `https://api.groq.com/openai/v1/chat/completions`. You can set another OpenAI-compatible endpoint if appropriate for your provider.
-
-## Security note
-
-This first version calls the provider directly from the browser. The key is saved in that browser's localStorage, not in the repository. This is convenient for a personal prototype but is **not as secure as a backend**: anyone with access to your browser profile can inspect browser storage, and browser extensions or injected scripts could potentially access it. Use a low-limit test key, never share the browser profile, and revoke the key if exposed. For a public or multi-user deployment, replace direct browser calls with a backend that keeps secrets in server-side environment variables.
-
-## Teaching vs training
-
-- **Teaching** saves explicit memory entries and sends them as context to the model.
-- **Training examples** save prompt/ideal-answer pairs and provide a small set as context examples.
-- Neither action changes model weights. Real fine-tuning requires a compatible model and a separate training service.
-
-## Hosting
-
-GitHub Pages can host the frontend. The model provider must allow browser-origin requests; if the browser blocks a request due to CORS, a small backend proxy is required. Never put an API key directly in HTML, JavaScript, or a committed configuration file.
+## Data
+Memories, examples, evaluations, and model endpoint settings are stored in localStorage for this browser. Export a backup before clearing browser data.
