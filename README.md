@@ -10,8 +10,8 @@ A GitHub Pages control panel for teaching, dataset curation, evaluation, and exp
 - Export JSONL, CSV, JSON backup, and a source ZIP
 - Import Marcus data from a backup ZIP
 
-## Browser Llama
-The site can load `Llama-3.1-8B-Instruct-q4f16_1-MLC` using WebLLM and WebGPU directly in a compatible browser. Click **Load Llama in this browser** in Model connection. The first load downloads several GB of model assets and requires a compatible browser/device with WebGPU and sufficient memory. Support varies; if it fails, try a current Chromium-based browser on a supported computer. The model is downloaded from its model host and may be cached by the browser; it is not stored in this repository. An optional OpenAI-compatible endpoint remains available as a fallback.
+## Website inference (remote)
+The website does not load model weights into the browser. It sends chat requests to a separately deployed Cloudflare Worker, which calls Cloudflare Workers AI for remote inference. See `worker/README.md` for deployment steps. The endpoint must be set in **Model connection**. The hosted website can chat without downloading a model onto your laptop; chat messages are sent to the hosted service.
 
 Groq can help prepare and evaluate examples; it does not fine-tune Llama model weights. The JSONL export is training data, not a trained model. Actual fine-tuning requires a separate provider or GPU environment that supports the selected model.
 
